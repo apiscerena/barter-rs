@@ -13,6 +13,10 @@ categories = ["accessibility", "simulation"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "e1"
+path = "fire/engine_1.rs"
+
 [dependencies]
 # Barter Ecosystem
 barter-data = "0.7.0"
