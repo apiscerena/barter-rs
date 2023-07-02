@@ -20,15 +20,14 @@ use barter_data::{
     event::{DataKind, MarketEvent},
     exchange::{binance::spot::BinanceSpot, ExchangeId},
     streams::Streams,
-    subscription::trade::PublicTrades,
+    subscription::{trade::PublicTrades, book::OrderBooksL1},
 };
 use barter_integration::model::{instrument::kind::InstrumentKind, Market};
 use parking_lot::Mutex;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-const ENGINE_RUN_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() {
@@ -112,13 +111,15 @@ async fn main() {
     // Run Engine trading & listen to Events it produces
     tokio::spawn(listen_to_engine_events(event_rx));
 
-    let _ = tokio::time::timeout(ENGINE_RUN_TIMEOUT, engine.run()).await;
+    engine.run().await;
 }
+
 
 async fn stream_market_event_trades() -> mpsc::UnboundedReceiver<MarketEvent<DataKind>> {
     // Initialise PublicTrades Streams for BinanceSpot
     // '--> each call to StreamBuilder::subscribe() creates a separate WebSocket connection
-    let mut streams = Streams::<PublicTrades>::builder()
+    let mut streams: Streams<MarketEvent<DataKind>> = Streams::builder_multi()
+    .add(Streams::<PublicTrades>::builder()
         // Separate WebSocket connection for BTC_USDT stream since it's very high volume
         .subscribe([(
             BinanceSpot::default(),
@@ -135,9 +136,22 @@ async fn stream_market_event_trades() -> mpsc::UnboundedReceiver<MarketEvent<Dat
             InstrumentKind::Spot,
             PublicTrades,
         )])
-        .init()
-        .await
-        .unwrap();
+        .subscribe([(
+            BinanceSpot::default(),
+            "ar",
+            "usdt",
+            InstrumentKind::Spot,
+            PublicTrades,
+        )])
+    )
+    .add(Streams::<OrderBooksL1>::builder()
+            .subscribe([
+                (BinanceSpot::default(), "btc", "usdt", InstrumentKind::Spot, OrderBooksL1),
+            ])
+     )
+    .init()
+    .await
+    .unwrap();
 
     // Select the ExchangeId::BinanceSpot stream
     // Notes:
