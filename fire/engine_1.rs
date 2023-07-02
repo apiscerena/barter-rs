@@ -14,7 +14,7 @@ use barter::{
         trading::{Config as StatisticConfig, TradingSummary},
         Initialiser,
     },
-    strategy::example::{Config as StrategyConfig, RSIStrategy},
+    strategy::rsi::{Config as StrategyConfig, RSIStrategy},
 };
 use barter_data::{
     event::{DataKind, MarketEvent},
