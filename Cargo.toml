@@ -19,8 +19,8 @@ path = "fire/engine_1.rs"
 
 [dependencies]
 # Barter Ecosystem
-barter-data = { version = "0.7.0", git = "https://github.com/apiscerena/barter-data-rs", branch = "wildfire"}
-barter-integration = { version = "0.5.3", git = "https://github.com/apiscerena/barter-integration-rs", branch = "wildfire"}
+barter-data = { git = "https://github.com/apiscerena/barter-data-rs", branch = "wildfire" }
+barter-integration = { git = "https://github.com/apiscerena/barter-integration-rs", branch = "wildfire" }
 
 # Logging
 tracing = "0.1.36"
