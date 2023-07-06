@@ -16,18 +16,14 @@ use barter::{
     },
     strategy::rsi::{Config as StrategyConfig, RSIStrategy},
 };
-use barter_data::{
-    event::{DataKind, MarketEvent},
-    exchange::{binance::spot::BinanceSpot, ExchangeId},
-    streams::Streams,
-    subscription::{trade::PublicTrades, book::OrderBooksL1},
-};
+
 use barter_integration::model::{instrument::kind::InstrumentKind, Market};
 use parking_lot::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+pub mod streams;
 
 #[tokio::main]
 async fn main() {
@@ -77,7 +73,7 @@ async fn main() {
             .command_rx(trader_command_rx)
             .event_tx(event_tx.clone())
             .portfolio(Arc::clone(&portfolio))
-            .data(live::MarketFeed::new(stream_market_event_trades().await))
+            .data(live::MarketFeed::new(streams::stream_market_event().await))
             .strategy(RSIStrategy::new(StrategyConfig { rsi_period: 14 }))
             .execution(SimulatedExecution::new(ExecutionConfig {
                 simulated_fees_pct: Fees {
@@ -112,62 +108,6 @@ async fn main() {
     tokio::spawn(listen_to_engine_events(event_rx));
 
     engine.run().await;
-}
-
-
-async fn stream_market_event_trades() -> mpsc::UnboundedReceiver<MarketEvent<DataKind>> {
-    // Initialise PublicTrades Streams for BinanceSpot
-    // '--> each call to StreamBuilder::subscribe() creates a separate WebSocket connection
-    let mut streams: Streams<MarketEvent<DataKind>> = Streams::builder_multi()
-    .add(Streams::<PublicTrades>::builder()
-        // Separate WebSocket connection for BTC_USDT stream since it's very high volume
-        .subscribe([(
-            BinanceSpot::default(),
-            "btc",
-            "usdt",
-            InstrumentKind::Spot,
-            PublicTrades,
-        )])
-        // Separate WebSocket connection for ETH_USDT stream since it's very high volume
-        .subscribe([(
-            BinanceSpot::default(),
-            "eth",
-            "usdt",
-            InstrumentKind::Spot,
-            PublicTrades,
-        )])
-        .subscribe([(
-            BinanceSpot::default(),
-            "ar",
-            "usdt",
-            InstrumentKind::Spot,
-            PublicTrades,
-        )])
-    )
-    .add(Streams::<OrderBooksL1>::builder()
-            .subscribe([
-                (BinanceSpot::default(), "btc", "usdt", InstrumentKind::Spot, OrderBooksL1),
-            ])
-     )
-    .init()
-    .await
-    .unwrap();
-
-    // Select the ExchangeId::BinanceSpot stream
-    // Notes:
-    //  - Use `streams.select(ExchangeId)` to interact with the individual exchange streams!
-    //  - Use `streams.join()` to join all exchange streams into a single mpsc::UnboundedReceiver!
-    let mut trade_rx = streams.select(ExchangeId::BinanceSpot).unwrap();
-
-    let (tx, rx) = mpsc::unbounded_channel();
-
-    tokio::spawn(async move {
-        while let Some(trade) = trade_rx.recv().await {
-            let _ = tx.send(MarketEvent::from(trade));
-        }
-    });
-
-    rx
 }
 
 // Listen to Events that occur in the Engine. These can be used for updating event-sourcing,
